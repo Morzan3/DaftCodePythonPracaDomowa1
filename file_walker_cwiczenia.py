@@ -1,0 +1,60 @@
+import os
+
+def sample_directory_walker(new_cwd=None):
+    old_cwd = os.getcwd()
+    if new_cwd:
+        os.chdir(new_cwd)
+    # to nam nie daje wszystkich wyników (pomija foldery)
+    for root, dirs, files in os.walk(os.getcwd(), topdown=False):
+        print('{}, {}, {}\n'.format(root, dirs, files))
+    if new_cwd:
+        os.chdir(old_cwd)
+
+# sample_directory_walker('/home/marcin/kursy')
+def format_sizes(sizes):
+    keys = list(sizes.keys())
+    keys.sort()
+    entry_format = '\t{}: {}'
+    entry_lines = (entry_format.format(k, sizes[k]) for k in keys)
+    return '{}\n{}\n{}'.format('{', '\n'.join(entry_lines), '}')
+
+
+def my_directory_walker_with_size_counting(topdir=None):
+    if topdir is None:
+        topdir = os.getcwd()
+    sizes = {topdir: 0}
+    root_stack = []
+    current_root_size = 0
+
+    def inner_walker(new_topdir):
+        root_stack.append(new_topdir)
+        new_topdir_path = os.path.join(*root_stack)
+        try:
+            entries = os.scandir(new_topdir_path)
+            size = 0
+            for entry in entries:
+                if entry.is_dir(follow_symlinks=False):
+                    entry_size = inner_walker(entry.name)
+                    if entry_size:
+                        sizes[os.path.join(*root_stack)] = entry_size
+                        size += entry_size
+                    root_stack.pop()
+                elif entry.is_file(follow_symlinks=False):
+                    if entry.stat().st_size:
+                        sizes[os.path.join(*root_stack, entry.name)] = entry.stat().st_size
+                        size += entry.stat().st_size # os.path.getsize
+            return size
+        except PermissionError:
+            print("You dont have permission to access this file")
+        except Exception as e:
+            print("Error occured: {}".format(e))
+    inner_walker(topdir)
+    sizes[topdir] = sum(sizes.values()) #rozmiar topdir to suma wielkości wszystkich plików się w nim znajdujących
+    return sizes
+
+
+sizes = my_directory_walker_with_size_counting('/home/marcin')
+#sizes = my_directory_walker_with_size_counting('/home/marcin')
+
+print(format_sizes(sizes))
+print(len(sizes))
